@@ -1,0 +1,56 @@
+{
+  "name": "simple-api-client",
+  "displayName": "Simple API Client",
+  "description": "A lightweight Postman-like HTTP Client inside VS Code.",
+  "version": "0.0.1",
+  "publisher": "shaun",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other",
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onView:simpleApiClient.sidebar"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "simpleApiClient",
+          "title": "Simple API Client",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "simpleApiClient": [
+        {
+          "type": "webview",
+          "id": "simpleApiClient.sidebar",
+          "name": "Simple API Client"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "simpleApiClient.openPanel",
+        "title": "Open Full API Client Tab",
+        "category": "Simple API Client"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.3.3"
+  }
+}
