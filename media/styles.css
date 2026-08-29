@@ -4,6 +4,8 @@
   --color-put: #3b82f6;
   --color-delete: #ef4444;
   --color-patch: #8b5cf6;
+  --color-head: #10b981;
+  --color-options: #6366f1;
 }
 
 * {
@@ -37,6 +39,40 @@ body {
   display: block;
 }
 
+/* Toast 通知浮层 */
+.toast-notification {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  background: var(--vscode-editorWidget-background, #252526);
+  color: var(--vscode-foreground, #fff);
+  border: 1px solid var(--vscode-focusBorder, #3b82f6);
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  z-index: 9999;
+  opacity: 0;
+  transform: translateY(-12px);
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toast-notification.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast-notification.success {
+  border-color: #28a745;
+  color: #28a745;
+  background: var(--vscode-editorWidget-background, #1e1e1e);
+}
+
 /* Header & Title */
 .header-title {
   display: flex;
@@ -61,6 +97,35 @@ body {
   gap: 6px;
 }
 
+.icon-btn-secondary {
+  background: transparent;
+  border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.3));
+  color: var(--vscode-foreground);
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.icon-btn-secondary:hover {
+  border-color: var(--vscode-focusBorder);
+  background: rgba(128, 128, 128, 0.15);
+}
+
+.shortcut-tip {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  background: rgba(128, 128, 128, 0.15);
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  border: 1px solid rgba(128, 128, 128, 0.2);
+  user-select: none;
+}
+
 .save-btn {
   background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.2));
   color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
@@ -81,16 +146,19 @@ body {
 }
 
 .save-btn.saved {
-  background-color: rgba(40, 167, 69, 0.2);
-  color: #28a745;
-  border-color: #28a745;
+  background-color: rgba(40, 167, 69, 0.25) !important;
+  color: #28a745 !important;
+  border-color: #28a745 !important;
 }
 
-/* ==================== 页面 A: 群组管理样式 ==================== */
+/* ==================== 页面 A: 群组下拉折叠列表 ==================== */
+.group-toolbar {
+  margin-bottom: 12px;
+}
+
 .create-group-bar {
   display: flex;
   gap: 8px;
-  margin-bottom: 14px;
 }
 
 .new-group-input {
@@ -101,7 +169,7 @@ body {
   color: var(--vscode-input-foreground);
   border-radius: 4px;
   outline: none;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .new-group-input:focus {
@@ -112,7 +180,7 @@ body {
   background-color: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
   border: none;
-  padding: 6px 14px;
+  padding: 6px 12px;
   border-radius: 4px;
   font-weight: 600;
   font-size: 12px;
@@ -121,95 +189,249 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  transition: background-color 0.15s;
 }
 
 .primary-btn:hover {
   background-color: var(--vscode-button-hoverBackground);
 }
 
-.groups-grid {
+.groups-accordion-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
-.group-card {
-  background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.06));
+/* 群组手风琴卡片容器 */
+.group-accordion-card {
+  background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.05));
   border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
   border-radius: 6px;
-  padding: 10px 12px;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.group-accordion-card:hover {
+  border-color: var(--vscode-focusBorder, rgba(59, 130, 246, 0.6));
+}
+
+/* 群组手风琴头部 (下拉开关) */
+.group-accordion-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  transition: all 0.2s;
+  padding: 8px 10px;
+  background: rgba(128, 128, 128, 0.06);
   cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s;
 }
 
-.group-card:hover {
-  border-color: var(--vscode-focusBorder, #3b82f6);
-  background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
+.group-accordion-header:hover {
+  background: rgba(128, 128, 128, 0.12);
 }
 
-.group-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
-}
-
-.group-folder-icon {
-  font-size: 20px;
-}
-
-.group-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.group-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--vscode-foreground);
-}
-
-.group-meta {
-  font-size: 11px;
-  color: var(--vscode-descriptionForeground);
+.group-header-left {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
+  min-width: 0;
 }
 
-.group-req-badge {
+.group-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vscode-descriptionForeground);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.group-accordion-card.expanded .group-chevron {
+  transform: rotate(90deg);
+}
+
+.group-folder-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.group-title-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-count-badge {
   background: rgba(59, 130, 246, 0.15);
   color: #3b82f6;
-  padding: 1px 6px;
+  padding: 1px 7px;
   border-radius: 10px;
   font-weight: 600;
   font-size: 10px;
+  flex-shrink: 0;
 }
 
-.group-actions {
+.group-header-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: 8px;
 }
 
-.group-enter-btn {
+.group-add-req-btn {
   background-color: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.2));
   color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
-  border: none;
-  padding: 4px 10px;
+  border: 1px solid var(--vscode-input-border, transparent);
+  padding: 2px 7px;
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  transition: all 0.15s;
 }
 
-.group-enter-btn:hover {
+.group-add-req-btn:hover {
   background-color: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
+}
+
+/* 群组下拉手风琴内部 (HTTP 请求列表) */
+.group-accordion-body {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px 8px 8px;
+  border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.15));
+  background-color: var(--vscode-editor-background);
+}
+
+.group-accordion-card.expanded .group-accordion-body {
+  display: flex;
+}
+
+/* 单独的 HTTP 请求调用项 */
+.request-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.04));
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  gap: 8px;
+}
+
+.request-item:hover {
+  background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
+  border-color: var(--vscode-focusBorder, rgba(59, 130, 246, 0.4));
+  transform: translateX(2px);
+}
+
+.request-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.request-method-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 5px;
+  border-radius: 3px;
+  min-width: 48px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.request-method-badge[data-method="GET"] {
+  background: rgba(40, 167, 69, 0.15);
+  color: var(--color-get);
+}
+.request-method-badge[data-method="POST"] {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--color-post);
+}
+.request-method-badge[data-method="PUT"] {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--color-put);
+}
+.request-method-badge[data-method="DELETE"] {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-delete);
+}
+.request-method-badge[data-method="PATCH"] {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--color-patch);
+}
+.request-method-badge[data-method="HEAD"] {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--color-head);
+}
+.request-method-badge[data-method="OPTIONS"] {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--color-options);
+}
+
+.request-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.request-name-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.request-url-label {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family, monospace);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.request-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.request-item:hover .request-item-actions {
+  opacity: 1;
+}
+
+.empty-group-requests {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  text-align: center;
+  padding: 12px;
+  border: 1px dashed var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
+  border-radius: 4px;
 }
 
 .empty-groups-box {
@@ -220,7 +442,7 @@ body {
   border-radius: 6px;
 }
 
-/* ==================== 页面 B: 工作台导航样式 ==================== */
+/* ==================== 页面 B: 工作台导航与请求编辑样式 ==================== */
 .workbench-nav-bar {
   display: flex;
   align-items: center;
@@ -240,7 +462,7 @@ body {
   background: transparent;
   border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.3));
   color: var(--vscode-foreground);
-  padding: 3px 8px;
+  padding: 4px 10px;
   border-radius: 4px;
   cursor: pointer;
   font-size: 11px;
@@ -252,7 +474,7 @@ body {
 
 .back-btn:hover {
   border-color: var(--vscode-focusBorder);
-  background: rgba(128, 128, 128, 0.1);
+  background: rgba(128, 128, 128, 0.15);
 }
 
 .nav-divider {
@@ -332,6 +554,8 @@ body {
 .tab-method-tag[data-method="PUT"] { color: var(--color-put); }
 .tab-method-tag[data-method="DELETE"] { color: var(--color-delete); }
 .tab-method-tag[data-method="PATCH"] { color: var(--color-patch); }
+.tab-method-tag[data-method="HEAD"] { color: var(--color-head); }
+.tab-method-tag[data-method="OPTIONS"] { color: var(--color-options); }
 
 .tab-title-text {
   overflow: hidden;
@@ -434,6 +658,8 @@ body {
 .method-select[data-method="PUT"] { color: var(--color-put); }
 .method-select[data-method="DELETE"] { color: var(--color-delete); }
 .method-select[data-method="PATCH"] { color: var(--color-patch); }
+.method-select[data-method="HEAD"] { color: var(--color-head); }
+.method-select[data-method="OPTIONS"] { color: var(--color-options); }
 
 .url-input-container {
   flex: 1;
@@ -588,16 +814,17 @@ body {
   border: none;
   color: var(--vscode-descriptionForeground);
   cursor: pointer;
-  padding: 4px;
+  padding: 4px 6px;
   border-radius: 3px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  font-size: 12px;
 }
 
 .icon-btn:hover {
   color: var(--vscode-errorForeground, #ef4444);
-  background-color: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.1));
+  background-color: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.15));
 }
 
 .add-header-btn {

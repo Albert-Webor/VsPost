@@ -51,53 +51,69 @@ function getWebviewHtml(webview, extensionUri) {
 </head>
 <body>
   <div class="container">
-    <!-- ==================== 页面 A: 群组管理列表 ==================== -->
+    <!-- Toast 通知浮层 -->
+    <div id="toast" class="toast-notification"></div>
+
+    <!-- ==================== 页面 A: 群组下拉折叠列表 ==================== -->
     <div id="view-groups" class="view-page active">
       <div class="header-title">
         <h2>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
           </svg>
-          API Groups & Collections
+          API Collections & Groups
         </h2>
         <div class="header-actions">
-          <button class="small-btn save-btn global-save-btn" title="保存所有群组与请求">
+          <button id="expand-all-btn" class="icon-btn-secondary" title="Expand All Groups">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <button id="collapse-all-btn" class="icon-btn-secondary" title="Collapse All Groups">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg>
+          </button>
+          <button class="small-btn save-btn global-save-btn" title="Save all groups and requests (⌘S / Ctrl+S)">
             <span>💾</span> <span class="save-text">Save</span>
           </button>
         </div>
       </div>
 
-      <!-- 新增群组操作栏 -->
-      <div class="create-group-bar">
-        <input 
-          id="new-group-input" 
-          type="text" 
-          class="new-group-input" 
-          placeholder="Enter new group name (e.g. Auth Service, User APIs)..." 
-        />
-        <button id="create-group-btn" class="primary-btn">
-          + Create Group
-        </button>
+      <!-- 新增群组操作栏与搜索栏 -->
+      <div class="group-toolbar">
+        <div class="create-group-bar">
+          <input 
+            id="new-group-input" 
+            type="text" 
+            class="new-group-input" 
+            placeholder="Enter new group name (e.g. Auth Service, User APIs)..." 
+          />
+          <button id="create-group-btn" class="primary-btn">
+            + New Group
+          </button>
+        </div>
       </div>
 
-      <!-- 群组卡片网格列表 -->
-      <div id="groups-list" class="groups-grid"></div>
+      <!-- 群组下拉手风琴列表 -->
+      <div id="groups-list" class="groups-accordion-list"></div>
     </div>
 
     <!-- ==================== 页面 B: 群组内部 HTTP 请求工作台 ==================== -->
     <div id="view-request-workbench" class="view-page">
-      <!-- 顶部导航栏 (返回群组 + 群组名面包屑 + 保存) -->
+      <!-- 顶部导航栏 (返回群组 + 群组名面包屑 + 保存 + 快捷键提示 + 独立关闭按钮) -->
       <div class="workbench-nav-bar">
         <div class="nav-left">
-          <button id="back-to-groups-btn" class="back-btn" title="返回群组列表">
-            ← All Groups
+          <button id="back-to-groups-btn" class="back-btn" title="Close editor and return to groups list (Request is preserved)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            <span>Close & Back</span>
           </button>
           <span class="nav-divider">/</span>
           <span id="current-group-badge" class="current-group-badge">Default Group</span>
         </div>
         <div class="header-actions">
-          <button class="small-btn save-btn global-save-btn" title="保存所有群组与请求">
-            <span>💾</span> <span class="save-text">Save</span>
+          <span class="shortcut-tip" title="Shortcut to save">⌘S / Ctrl+S to save</span>
+          <button class="small-btn save-btn global-save-btn" title="Save current request (⌘S / Ctrl+S)">
+            <span>💾</span> <span class="save-text">Save (⌘S)</span>
+          </button>
+          <button id="close-workbench-btn" class="icon-btn-secondary close-nav-btn" title="Close editor (Request is preserved in dropdown)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </div>
       </div>
@@ -105,7 +121,7 @@ function getWebviewHtml(webview, extensionUri) {
       <!-- Request Tabs Bar (当前群组内的多请求标签栏) -->
       <div class="request-tabs-bar">
         <div id="request-tabs-list" class="request-tabs-list"></div>
-        <button id="add-tab-btn" class="add-tab-btn" title="新建请求页面 (New Request)">+</button>
+        <button id="add-tab-btn" class="add-tab-btn" title="New Request in this Group">+</button>
       </div>
 
       <!-- Request Title / Rename Bar -->
@@ -121,6 +137,8 @@ function getWebviewHtml(webview, extensionUri) {
           <option value="PUT">PUT</option>
           <option value="DELETE">DELETE</option>
           <option value="PATCH">PATCH</option>
+          <option value="HEAD">HEAD</option>
+          <option value="OPTIONS">OPTIONS</option>
         </select>
 
         <div class="url-input-container">
