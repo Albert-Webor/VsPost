@@ -2,7 +2,7 @@
   "name": "simple-api-client",
   "displayName": "Simple API Client",
   "description": "A lightweight Postman-like HTTP Client inside VS Code.",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "publisher": "shaun",
   "engines": {
     "vscode": "^1.80.0"

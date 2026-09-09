@@ -54,16 +54,22 @@ function getWebviewHtml(webview, extensionUri) {
     <!-- Toast 通知浮层 -->
     <div id="toast" class="toast-notification"></div>
 
-    <!-- ==================== 页面 A: 群组下拉折叠列表 ==================== -->
+    <!-- ==================== 页面 A: 群组下拉折叠列表 & 历史记录 ==================== -->
     <div id="view-groups" class="view-page active">
-      <div class="header-title">
-        <h2>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-          </svg>
-          API Collections & Groups
-        </h2>
-        <div class="header-actions">
+      <!-- 顶部主导航 Segment: Collections vs History -->
+      <div class="main-segment-bar">
+        <div class="segment-tabs">
+          <button id="seg-btn-collections" class="segment-tab active">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            <span>Collections</span>
+          </button>
+          <button id="seg-btn-history" class="segment-tab">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <span>History</span> <span id="history-count-badge" class="badge"></span>
+          </button>
+        </div>
+
+        <div id="collections-header-actions" class="header-actions">
           <button id="expand-all-btn" class="icon-btn-secondary" title="Expand All Groups">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
           </button>
@@ -74,25 +80,39 @@ function getWebviewHtml(webview, extensionUri) {
             <span>💾</span> <span class="save-text">Save</span>
           </button>
         </div>
-      </div>
 
-      <!-- 新增群组操作栏与搜索栏 -->
-      <div class="group-toolbar">
-        <div class="create-group-bar">
-          <input 
-            id="new-group-input" 
-            type="text" 
-            class="new-group-input" 
-            placeholder="Enter new group name (e.g. Auth Service, User APIs)..." 
-          />
-          <button id="create-group-btn" class="primary-btn">
-            + New Group
+        <div id="history-header-actions" class="header-actions" style="display: none;">
+          <button id="clear-history-btn" class="small-btn danger-hover" title="Clear all request history">
+            <span>🗑️ Clear All</span>
           </button>
         </div>
       </div>
 
-      <!-- 群组下拉手风琴列表 -->
-      <div id="groups-list" class="groups-accordion-list"></div>
+      <!-- 面板 1: Collections 面板 -->
+      <div id="panel-collections" class="main-panel active">
+        <!-- 新增群组操作栏与搜索栏 -->
+        <div class="group-toolbar">
+          <div class="create-group-bar">
+            <input 
+              id="new-group-input" 
+              type="text" 
+              class="new-group-input" 
+              placeholder="Enter new group name (e.g. Auth Service, User APIs)..." 
+            />
+            <button id="create-group-btn" class="primary-btn">
+              + New Group
+            </button>
+          </div>
+        </div>
+
+        <!-- 群组下拉手风琴列表 -->
+        <div id="groups-list" class="groups-accordion-list"></div>
+      </div>
+
+      <!-- 面板 2: History 历史记录面板 -->
+      <div id="panel-history" class="main-panel" style="display: none;">
+        <div id="history-list" class="history-list"></div>
+      </div>
     </div>
 
     <!-- ==================== 页面 B: 群组内部 HTTP 请求工作台 ==================== -->
@@ -241,11 +261,52 @@ function getWebviewHtml(webview, extensionUri) {
             <strong>Response</strong>
             <span id="status-badge" class="status-badge">-</span>
             <span id="time-badge" class="time-badge"></span>
+            <span id="size-badge" class="size-badge" style="display: none;"></span>
           </div>
-          <button id="copy-response-btn" class="small-btn">Copy</button>
+          <button id="copy-response-btn" class="small-btn" title="Copy response content">Copy</button>
         </div>
 
-        <pre id="response-body" class="response-box"><div class="empty-placeholder">Click 'Send' to make a request</div></pre>
+        <!-- Response Sub-Tabs (Body vs Headers) -->
+        <div class="resp-tabs-nav">
+          <button id="resp-tab-body-btn" class="resp-tab-btn active" data-resptab="body">
+            Body
+          </button>
+          <button id="resp-tab-headers-btn" class="resp-tab-btn" data-resptab="headers">
+            Headers <span id="resp-headers-count-badge" class="badge"></span>
+          </button>
+        </div>
+
+        <!-- Tab 1: Response Body -->
+        <div id="resp-pane-body" class="resp-pane active">
+          <pre id="response-body" class="response-box"><div class="empty-placeholder">Click 'Send' to make a request</div></pre>
+        </div>
+
+        <!-- Tab 2: Response Headers -->
+        <div id="resp-pane-headers" class="resp-pane" style="display: none;">
+          <div id="response-headers-box" class="response-box response-headers-box">
+            <div class="empty-placeholder">No response headers yet</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模态确认与输入对话框 (替代 VS Code webview 中被沙箱禁用的原生 confirm / prompt) -->
+  <div id="modal-overlay" class="modal-overlay">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="modal-title">Confirm</h3>
+        <button id="modal-close-btn" class="modal-close-btn" title="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="modal-message"></p>
+        <div id="modal-input-container" class="modal-input-container" style="display: none;">
+          <input id="modal-input" type="text" class="modal-input" autocomplete="off" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="modal-cancel-btn" class="modal-btn secondary-btn">Cancel</button>
+        <button id="modal-confirm-btn" class="modal-btn primary-btn">Confirm</button>
       </div>
     </div>
   </div>

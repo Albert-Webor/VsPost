@@ -12,6 +12,16 @@
   const toastEl = document.getElementById('toast');
 
   // Elements - Page A (Groups)
+  // Elements - Page A (Groups & Navigation)
+  const segBtnCollections = document.getElementById('seg-btn-collections');
+  const segBtnHistory = document.getElementById('seg-btn-history');
+  const panelCollections = document.getElementById('panel-collections');
+  const panelHistory = document.getElementById('panel-history');
+  const collectionsHeaderActions = document.getElementById('collections-header-actions');
+  const historyHeaderActions = document.getElementById('history-header-actions');
+  const historyCountBadge = document.getElementById('history-count-badge');
+  const historyList = document.getElementById('history-list');
+  const clearHistoryBtn = document.getElementById('clear-history-btn');
   const newGroupInput = document.getElementById('new-group-input');
   const createGroupBtn = document.getElementById('create-group-btn');
   const groupsList = document.getElementById('groups-list');
@@ -40,8 +50,125 @@
   const tabContents = document.querySelectorAll('.tab-content');
   const statusBadge = document.getElementById('status-badge');
   const timeBadge = document.getElementById('time-badge');
+  const sizeBadge = document.getElementById('size-badge');
   const responseBodyBox = document.getElementById('response-body');
   const copyResponseBtn = document.getElementById('copy-response-btn');
+
+  // Elements - Response Sub-Tabs
+  const respTabBodyBtn = document.getElementById('resp-tab-body-btn');
+  const respTabHeadersBtn = document.getElementById('resp-tab-headers-btn');
+  const respPaneBody = document.getElementById('resp-pane-body');
+  const respPaneHeaders = document.getElementById('resp-pane-headers');
+  const responseHeadersBox = document.getElementById('response-headers-box');
+  const respHeadersCountBadge = document.getElementById('resp-headers-count-badge');
+
+  // Elements - Modal Dialog (替代 VS Code webview 中禁用的 confirm / prompt)
+  const modalOverlay = document.getElementById('modal-overlay');
+  const modalTitle = document.getElementById('modal-title');
+  const modalMessage = document.getElementById('modal-message');
+  const modalInputContainer = document.getElementById('modal-input-container');
+  const modalInput = document.getElementById('modal-input');
+  const modalCancelBtn = document.getElementById('modal-cancel-btn');
+  const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+  const modalCloseBtn = document.getElementById('modal-close-btn');
+
+  let modalCallback = null;
+
+  function closeModal() {
+    if (!modalOverlay) return;
+    modalOverlay.classList.remove('visible');
+    modalCallback = null;
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function showConfirmModal({ title = 'Confirm', message, confirmText = 'Confirm', isDanger = false, onConfirm }) {
+    if (!modalOverlay) {
+      if (onConfirm) onConfirm();
+      return;
+    }
+    modalTitle.textContent = title;
+    modalMessage.innerHTML = message;
+    modalInputContainer.style.display = 'none';
+    modalConfirmBtn.textContent = confirmText;
+    modalConfirmBtn.className = isDanger ? 'modal-btn danger-btn' : 'modal-btn primary-btn';
+    modalCallback = (confirmed) => {
+      if (confirmed && onConfirm) onConfirm();
+    };
+    modalOverlay.classList.add('visible');
+    modalConfirmBtn.focus();
+  }
+
+  function showPromptModal({ title = 'Prompt', message, defaultValue = '', placeholder = '', onConfirm }) {
+    if (!modalOverlay) return;
+    modalTitle.textContent = title;
+    modalMessage.innerHTML = message || '';
+    modalInputContainer.style.display = 'block';
+    modalInput.value = defaultValue;
+    modalInput.placeholder = placeholder;
+    modalConfirmBtn.textContent = 'OK';
+    modalConfirmBtn.className = 'modal-btn primary-btn';
+    modalCallback = (confirmed) => {
+      if (confirmed && onConfirm) {
+        const val = modalInput.value.trim();
+        if (val) onConfirm(val);
+      }
+    };
+    modalOverlay.classList.add('visible');
+    setTimeout(() => {
+      modalInput.focus();
+      modalInput.select();
+    }, 50);
+  }
+
+  if (modalCancelBtn) {
+    modalCancelBtn.addEventListener('click', () => {
+      if (modalCallback) modalCallback(false);
+      closeModal();
+    });
+  }
+  if (modalCloseBtn) {
+    modalCloseBtn.addEventListener('click', () => {
+      if (modalCallback) modalCallback(false);
+      closeModal();
+    });
+  }
+  if (modalOverlay) {
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) {
+        if (modalCallback) modalCallback(false);
+        closeModal();
+      }
+    });
+  }
+  if (modalConfirmBtn) {
+    modalConfirmBtn.addEventListener('click', () => {
+      const cb = modalCallback;
+      closeModal();
+      if (cb) cb(true);
+    });
+  }
+  window.addEventListener('keydown', (e) => {
+    if (!modalOverlay || !modalOverlay.classList.contains('visible')) return;
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      if (modalCallback) modalCallback(false);
+      closeModal();
+    } else if (e.key === 'Enter') {
+      e.stopPropagation();
+      const cb = modalCallback;
+      closeModal();
+      if (cb) cb(true);
+    }
+  });
 
   // Toast Notification Helper
   let toastTimer = null;
@@ -99,9 +226,16 @@
     if (g.expanded === undefined) g.expanded = true;
     if (!g.openTabIds || !Array.isArray(g.openTabIds)) {
       g.openTabIds = g.tabs.map((t) => t.id);
+    } else {
+      // 过滤掉已被移除的失效 tabId
+      g.openTabIds = g.openTabIds.filter((id) => g.tabs.some((t) => t.id === id));
     }
-    if (!g.activeTabId && g.tabs.length > 0) {
-      g.activeTabId = g.tabs[0].id;
+    if (g.tabs.length > 0) {
+      if (!g.activeTabId || !g.tabs.some((t) => t.id === g.activeTabId)) {
+        g.activeTabId = g.tabs[0].id;
+      }
+    } else {
+      g.activeTabId = null;
     }
   }
 
@@ -111,11 +245,261 @@
     activeGroupId: null,
     groups: [
       createNewGroup('Default API Collection')
-    ]
+    ],
+    history: [] // 历史请求记录
   };
   appState.activeGroupId = appState.groups[0].id;
 
   let currentHeaders = [];
+  let currentMainSegment = 'collections'; // 'collections' | 'history'
+  let activeRespTab = 'body'; // 'body' | 'headers'
+
+  // ==================== 主导航 Segment 切换 (Collections vs History) ====================
+  function switchMainSegment(segment) {
+    currentMainSegment = segment;
+    if (segment === 'collections') {
+      if (segBtnCollections) segBtnCollections.classList.add('active');
+      if (segBtnHistory) segBtnHistory.classList.remove('active');
+      if (panelCollections) panelCollections.style.display = 'block';
+      if (panelHistory) panelHistory.style.display = 'none';
+      if (collectionsHeaderActions) collectionsHeaderActions.style.display = 'flex';
+      if (historyHeaderActions) historyHeaderActions.style.display = 'none';
+      renderGroupsList();
+    } else {
+      if (segBtnHistory) segBtnHistory.classList.add('active');
+      if (segBtnCollections) segBtnCollections.classList.remove('active');
+      if (panelCollections) panelCollections.style.display = 'none';
+      panelHistory.style.display = 'block';
+      if (collectionsHeaderActions) collectionsHeaderActions.style.display = 'none';
+      if (historyHeaderActions) historyHeaderActions.style.display = 'flex';
+      renderHistoryList();
+    }
+  }
+
+  if (segBtnCollections) {
+    segBtnCollections.addEventListener('click', () => switchMainSegment('collections'));
+  }
+  if (segBtnHistory) {
+    segBtnHistory.addEventListener('click', () => switchMainSegment('history'));
+  }
+
+  // ==================== 响应区 Sub-Tabs 切换 (Body vs Headers) ====================
+  function switchResponseTab(tabName) {
+    activeRespTab = tabName;
+    if (tabName === 'body') {
+      if (respTabBodyBtn) respTabBodyBtn.classList.add('active');
+      if (respTabHeadersBtn) respTabHeadersBtn.classList.remove('active');
+      if (respPaneBody) respPaneBody.style.display = 'block';
+      if (respPaneHeaders) respPaneHeaders.style.display = 'none';
+    } else {
+      if (respTabHeadersBtn) respTabHeadersBtn.classList.add('active');
+      if (respTabBodyBtn) respTabBodyBtn.classList.remove('active');
+      if (respPaneBody) respPaneBody.style.display = 'none';
+      if (respPaneHeaders) respPaneHeaders.style.display = 'block';
+    }
+  }
+
+  if (respTabBodyBtn) {
+    respTabBodyBtn.addEventListener('click', () => switchResponseTab('body'));
+  }
+  if (respTabHeadersBtn) {
+    respTabHeadersBtn.addEventListener('click', () => switchResponseTab('headers'));
+  }
+
+  // ==================== 请求历史记录逻辑 ====================
+  function formatTimeAgo(timestamp) {
+    if (!timestamp) return '';
+    const diffSec = Math.floor((Date.now() - timestamp) / 1000);
+    if (diffSec < 60) return 'Just now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const d = new Date(timestamp);
+    return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+  }
+
+  function addHistoryEntry({ method, url, name, headers, body, response, groupId, tabId }) {
+    if (!appState.history) appState.history = [];
+    const entry = {
+      id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      timestamp: Date.now(),
+      method: method || 'GET',
+      url: url || '',
+      name: name || '',
+      headers: JSON.parse(JSON.stringify(headers || [])),
+      body: body || '',
+      status: response?.status || (response?.success === false ? 'Error' : 200),
+      statusText: response?.statusText || (response?.error ? 'Error' : 'OK'),
+      timeMs: response?.timeMs || 0,
+      success: response?.success !== false,
+      response: response ? JSON.parse(JSON.stringify(response)) : null,
+      groupId: groupId,
+      tabId: tabId
+    };
+    appState.history.unshift(entry);
+    if (appState.history.length > 50) {
+      appState.history = appState.history.slice(0, 50);
+    }
+    updateHistoryBadge();
+    if (currentMainSegment === 'history') {
+      renderHistoryList();
+    }
+  }
+
+  function updateHistoryBadge() {
+    if (!historyCountBadge) return;
+    const count = appState.history ? appState.history.length : 0;
+    historyCountBadge.textContent = count > 0 ? count : '';
+  }
+
+  function renderHistoryList() {
+    if (!historyList) return;
+    historyList.innerHTML = '';
+    if (!appState.history || appState.history.length === 0) {
+      historyList.innerHTML = '<div class="empty-history-box">No request history yet.<br>Every sent request will be saved here automatically.</div>';
+      return;
+    }
+
+    appState.history.forEach((histItem, idx) => {
+      const itemEl = document.createElement('div');
+      itemEl.className = 'history-item';
+      itemEl.title = 'Click to open and re-run in Workbench';
+
+      // 顶部信息：Method + Status + Duration + Time + Delete
+      const topRow = document.createElement('div');
+      topRow.className = 'history-item-top';
+
+      const leftSide = document.createElement('div');
+      leftSide.className = 'history-item-left';
+
+      const methodBadge = document.createElement('span');
+      methodBadge.className = 'request-method-badge';
+      methodBadge.setAttribute('data-method', histItem.method || 'GET');
+      methodBadge.textContent = histItem.method || 'GET';
+      leftSide.appendChild(methodBadge);
+
+      const statusBadge = document.createElement('span');
+      const isSuccess = histItem.success && histItem.status >= 200 && histItem.status < 400;
+      statusBadge.className = 'status-badge ' + (isSuccess ? 'status-2xx' : 'status-err');
+      statusBadge.textContent = histItem.status ? `${histItem.status} ${histItem.statusText || ''}`.trim() : 'Err';
+      leftSide.appendChild(statusBadge);
+
+      if (histItem.timeMs !== undefined) {
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'history-time-ms';
+        timeSpan.textContent = `${histItem.timeMs}ms`;
+        leftSide.appendChild(timeSpan);
+      }
+
+      topRow.appendChild(leftSide);
+
+      const rightSide = document.createElement('div');
+      rightSide.className = 'history-item-right';
+
+      const timeAgo = document.createElement('span');
+      timeAgo.className = 'history-timestamp';
+      timeAgo.textContent = formatTimeAgo(histItem.timestamp);
+      timeAgo.title = histItem.timestamp ? new Date(histItem.timestamp).toLocaleString() : '';
+      rightSide.appendChild(timeAgo);
+
+      // 删除单条历史按钮
+      const delBtn = document.createElement('button');
+      delBtn.className = 'icon-btn';
+      delBtn.title = 'Delete this record';
+      delBtn.innerHTML = '✕';
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        appState.history.splice(idx, 1);
+        renderHistoryList();
+        updateHistoryBadge();
+        persistState();
+        showToast('History item deleted');
+      });
+      rightSide.appendChild(delBtn);
+
+      topRow.appendChild(rightSide);
+      itemEl.appendChild(topRow);
+
+      // 底部信息：请求名称与 URL
+      const bottomRow = document.createElement('div');
+      bottomRow.className = 'history-item-bottom';
+
+      const urlSpan = document.createElement('span');
+      urlSpan.className = 'history-url';
+      urlSpan.textContent = histItem.url || '(Empty URL)';
+      urlSpan.title = histItem.url || '';
+      bottomRow.appendChild(urlSpan);
+
+      itemEl.appendChild(bottomRow);
+
+      // 点击历史记录，在工作台中恢复并打开该请求
+      itemEl.addEventListener('click', () => {
+        openHistoryItemInWorkbench(histItem);
+      });
+
+      historyList.appendChild(itemEl);
+    });
+  }
+
+  function openHistoryItemInWorkbench(histItem) {
+    // 1. 如果该请求原本关联的群组与标签依然存在，则直接定位打开
+    if (histItem.groupId && histItem.tabId) {
+      const grp = appState.groups.find((g) => g.id === histItem.groupId);
+      if (grp) {
+        const tab = grp.tabs.find((t) => t.id === histItem.tabId);
+        if (tab) {
+          openRequestInWorkbench(grp.id, tab.id);
+          return;
+        }
+      }
+    }
+
+    // 2. 否则在当前活跃群组中创建/加载该历史记录
+    let grp = getActiveGroup();
+    if (!grp) {
+      grp = appState.groups[0];
+      appState.activeGroupId = grp.id;
+    }
+    const restoredTab = {
+      id: 'tab_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      name: histItem.name || (histItem.method + ' ' + (histItem.url ? histItem.url.split('/').pop().split('?')[0] : 'Request')),
+      method: histItem.method || 'GET',
+      url: histItem.url || '',
+      headers: JSON.parse(JSON.stringify(histItem.headers || DEFAULT_POSTMAN_HEADERS)),
+      body: histItem.body || '',
+      response: histItem.response || null
+    };
+    grp.tabs.push(restoredTab);
+    if (!grp.openTabIds) grp.openTabIds = [];
+    grp.openTabIds.push(restoredTab.id);
+    grp.activeTabId = restoredTab.id;
+
+    openRequestInWorkbench(grp.id, restoredTab.id);
+    showToast('Loaded request from history');
+  }
+
+  if (clearHistoryBtn) {
+    clearHistoryBtn.addEventListener('click', () => {
+      if (!appState.history || appState.history.length === 0) {
+        showToast('No history to clear', 'info');
+        return;
+      }
+      showConfirmModal({
+        title: 'Clear History',
+        message: 'Are you sure you want to clear all request history?',
+        confirmText: 'Clear All',
+        isDanger: true,
+        onConfirm: () => {
+          appState.history = [];
+          renderHistoryList();
+          updateHistoryBadge();
+          persistState();
+          showToast('History cleared');
+        }
+      });
+    });
+  }
 
   // 获取当前激活的群组
   function getActiveGroup() {
@@ -258,7 +642,7 @@
     if (appState.currentView === 'groups') {
       viewGroups.classList.add('active');
       viewRequestWorkbench.classList.remove('active');
-      renderGroupsList();
+      switchMainSegment(currentMainSegment);
     } else {
       viewGroups.classList.remove('active');
       viewRequestWorkbench.classList.add('active');
@@ -356,34 +740,57 @@
       renameBtn.innerHTML = '✏️';
       renameBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const newName = prompt('Enter new group name:', group.name);
-        if (newName && newName.trim()) {
-          group.name = newName.trim();
-          renderGroupsList();
-          persistState();
-          showToast('Group renamed');
-        }
+        showPromptModal({
+          title: 'Rename Group',
+          message: `Enter new name for group "<strong>${escapeHtml(group.name)}</strong>":`,
+          defaultValue: group.name,
+          placeholder: 'Group name',
+          onConfirm: (newName) => {
+            if (newName && newName.trim()) {
+              group.name = newName.trim();
+              renderGroupsList();
+              persistState();
+              showToast('Group renamed');
+            }
+          }
+        });
       });
       headerActions.appendChild(renameBtn);
 
       // 删除群组按钮
       const delBtn = document.createElement('button');
       delBtn.className = 'icon-btn';
-      delBtn.title = 'Delete Group';
+      delBtn.title = 'Delete Group (Shift+Click to delete directly)';
       delBtn.innerHTML = '🗑️';
+
+      const performDeleteGroup = () => {
+        const gIndex = appState.groups.findIndex((g) => g.id === group.id);
+        if (gIndex === -1) return;
+        const groupName = group.name;
+        appState.groups.splice(gIndex, 1);
+        if (appState.groups.length === 0) {
+          appState.groups = [createNewGroup('Default API Collection')];
+        }
+        if (appState.activeGroupId === group.id) {
+          appState.activeGroupId = appState.groups[0].id;
+        }
+        renderGroupsList();
+        persistState();
+        showToast(`Group "${groupName}" deleted`);
+      };
+
       delBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (confirm(`Are you sure you want to delete group "${group.name}" and all its requests?`)) {
-          appState.groups.splice(groupIndex, 1);
-          if (appState.groups.length === 0) {
-            appState.groups = [createNewGroup('Default API Collection')];
-          }
-          if (appState.activeGroupId === group.id) {
-            appState.activeGroupId = appState.groups[0].id;
-          }
-          renderGroupsList();
-          persistState();
-          showToast('Group deleted');
+        if (e.shiftKey) {
+          performDeleteGroup();
+        } else {
+          showConfirmModal({
+            title: 'Delete Group',
+            message: `Are you sure you want to delete group "<strong>${escapeHtml(group.name)}</strong>" and all its ${group.tabs ? group.tabs.length : 0} request(s)?`,
+            confirmText: 'Delete Group',
+            isDanger: true,
+            onConfirm: performDeleteGroup
+          });
         }
       });
       headerActions.appendChild(delBtn);
@@ -459,24 +866,51 @@
           });
           itemActions.appendChild(dupBtn);
 
-          // 删除请求 (带确认提示)
+          // 删除单个 HTTP 调用请求
           const delReqBtn = document.createElement('button');
           delReqBtn.className = 'icon-btn';
-          delReqBtn.title = 'Delete Request';
+          delReqBtn.title = 'Delete Request (Shift+Click to delete directly)';
           delReqBtn.innerHTML = '🗑️';
+
+          const performDeleteRequest = () => {
+            const currentIdx = group.tabs.findIndex((t) => t.id === tab.id);
+            if (currentIdx === -1) return;
+            const reqName = tab.name || tab.url || 'Request';
+            group.tabs.splice(currentIdx, 1);
+            if (group.openTabIds) {
+              group.openTabIds = group.openTabIds.filter((id) => id !== tab.id);
+            }
+            if (group.activeTabId === tab.id) {
+              group.activeTabId = group.tabs.length > 0 ? group.tabs[0].id : null;
+            }
+            // 同步工作台状态（若当前打开的正是被删除的请求）
+            if (appState.activeGroupId === group.id && appState.currentView === 'requestDetail') {
+              if (group.tabs.length === 0 || !group.openTabIds || group.openTabIds.length === 0) {
+                appState.currentView = 'groups';
+                renderView();
+              } else {
+                renderRequestTabs();
+                loadTabIntoUI(getActiveTab());
+              }
+            }
+            renderGroupsList();
+            persistState();
+            showToast(`Request "${reqName}" deleted`);
+          };
+
           delReqBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (confirm(`Delete request "${tab.name || tab.url}"?`)) {
-              group.tabs.splice(tabIndex, 1);
-              if (group.openTabIds) {
-                group.openTabIds = group.openTabIds.filter((id) => id !== tab.id);
-              }
-              if (group.activeTabId === tab.id && group.tabs.length > 0) {
-                group.activeTabId = group.tabs[0].id;
-              }
-              renderGroupsList();
-              persistState();
-              showToast('Request removed from group');
+            if (e.shiftKey) {
+              performDeleteRequest();
+            } else {
+              const displayName = tab.name || tab.url || 'Untitled Request';
+              showConfirmModal({
+                title: 'Delete Request',
+                message: `Are you sure you want to delete request "<strong>${escapeHtml(displayName)}</strong>"?`,
+                confirmText: 'Delete',
+                isDanger: true,
+                onConfirm: performDeleteRequest
+              });
             }
           });
           itemActions.appendChild(delReqBtn);
@@ -672,13 +1106,34 @@
       statusBadge.textContent = '-';
       statusBadge.className = 'status-badge';
       timeBadge.textContent = '';
+      if (sizeBadge) sizeBadge.style.display = 'none';
       responseBodyBox.innerHTML = '<div class="empty-placeholder">Click \'Send\' to make a request</div>';
+      if (responseHeadersBox) {
+        responseHeadersBox.innerHTML = '<div class="empty-placeholder">No response headers yet</div>';
+      }
+      if (respHeadersCountBadge) respHeadersCountBadge.textContent = '';
       return;
     }
 
     if (resData.success) {
       statusBadge.textContent = `${resData.status} ${resData.statusText}`;
       timeBadge.textContent = `${resData.timeMs} ms`;
+
+      // 响应体大小计算与展示
+      if (sizeBadge) {
+        let byteCount = 0;
+        if (resData.body) {
+          byteCount = new Blob([resData.body]).size;
+        } else if (resData.headers && (resData.headers['content-length'] || resData.headers['Content-Length'])) {
+          byteCount = parseInt(resData.headers['content-length'] || resData.headers['Content-Length'], 10) || 0;
+        }
+        if (byteCount > 0) {
+          sizeBadge.textContent = byteCount < 1024 ? `${byteCount} B` : `${(byteCount / 1024).toFixed(1)} KB`;
+          sizeBadge.style.display = 'inline-block';
+        } else {
+          sizeBadge.style.display = 'none';
+        }
+      }
 
       statusBadge.className = 'status-badge';
       if (resData.status >= 200 && resData.status < 300) {
@@ -689,17 +1144,44 @@
         statusBadge.classList.add('status-4xx');
       }
 
+      // 1. 渲染响应体
       if (resData.body) {
         responseBodyBox.innerHTML = highlightJson(resData.body);
       } else {
-        responseBodyBox.innerHTML = '<span style="color:var(--vscode-descriptionForeground)">(Empty Response)</span>';
+        responseBodyBox.innerHTML = '<span style="color:var(--vscode-descriptionForeground)">(Empty Response Body)</span>';
       }
+
+      // 2. 渲染响应头
+      renderResponseHeaders(resData.headers);
     } else {
       statusBadge.textContent = 'Error';
       statusBadge.className = 'status-badge status-err';
       timeBadge.textContent = `${resData.timeMs || 0} ms`;
+      if (sizeBadge) sizeBadge.style.display = 'none';
       responseBodyBox.textContent = `Request Failed:\n${resData.error}`;
+      renderResponseHeaders(resData.headers);
     }
+  }
+
+  function renderResponseHeaders(headersObj) {
+    if (!responseHeadersBox) return;
+    if (!headersObj || Object.keys(headersObj).length === 0) {
+      responseHeadersBox.innerHTML = '<div class="empty-placeholder">(No headers returned)</div>';
+      if (respHeadersCountBadge) respHeadersCountBadge.textContent = '';
+      return;
+    }
+
+    const entries = Object.entries(headersObj);
+    if (respHeadersCountBadge) {
+      respHeadersCountBadge.textContent = entries.length;
+    }
+
+    let html = '<table class="resp-headers-table"><thead><tr><th>Header</th><th>Value</th></tr></thead><tbody>';
+    entries.forEach(([k, v]) => {
+      html += `<tr><td class="resp-header-key">${escapeHtml(k)}</td><td class="resp-header-val">${escapeHtml(String(v))}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    responseHeadersBox.innerHTML = html;
   }
 
   function updateHeadersBadge() {
@@ -990,7 +1472,12 @@
     statusBadge.textContent = 'Loading...';
     statusBadge.className = 'status-badge';
     timeBadge.textContent = '';
+    if (sizeBadge) sizeBadge.style.display = 'none';
     responseBodyBox.textContent = 'Sending request...';
+    if (responseHeadersBox) {
+      responseHeadersBox.innerHTML = '<div class="empty-placeholder">Waiting for response headers...</div>';
+    }
+    if (respHeadersCountBadge) respHeadersCountBadge.textContent = '';
 
     vscode.postMessage({
       command: 'sendRequest',
@@ -1015,6 +1502,17 @@
         const targetTab = grp.tabs.find((t) => t.id === message.tabId) || getActiveTab();
         if (targetTab) {
           targetTab.response = data;
+          // 自动记录到历史记录中
+          addHistoryEntry({
+            method: targetTab.method,
+            url: targetTab.url,
+            name: targetTab.name,
+            headers: targetTab.headers,
+            body: targetTab.body,
+            response: data,
+            groupId: grp.id,
+            tabId: targetTab.id
+          });
         }
         if (targetTab && targetTab.id === grp.activeTabId) {
           renderResponse(data);
@@ -1032,9 +1530,22 @@
   });
 
   copyResponseBtn.addEventListener('click', () => {
-    const text = responseBodyBox.textContent;
-    if (text && text !== '(Empty Response)' && !text.startsWith('Sending')) {
-      navigator.clipboard.writeText(text).then(() => {
+    let textToCopy = '';
+    const activeTab = getActiveTab();
+    const resData = activeTab ? activeTab.response : null;
+
+    if (activeRespTab === 'headers') {
+      if (resData && resData.headers && Object.keys(resData.headers).length > 0) {
+        textToCopy = Object.entries(resData.headers)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join('\n');
+      }
+    } else {
+      textToCopy = responseBodyBox.textContent;
+    }
+
+    if (textToCopy && textToCopy !== '(Empty Response Body)' && !textToCopy.startsWith('Click \'Send\'') && !textToCopy.startsWith('Sending') && !textToCopy.startsWith('Waiting')) {
+      navigator.clipboard.writeText(textToCopy).then(() => {
         const originalText = copyResponseBtn.textContent;
         copyResponseBtn.textContent = 'Copied!';
         setTimeout(() => {
@@ -1071,12 +1582,17 @@
             openTabIds: [initialTabId],
             tabs: data.tabs
           }
-        ]
+        ],
+        history: []
       };
+    }
+    if (!appState.history || !Array.isArray(appState.history)) {
+      appState.history = [];
     }
     if (!appState.groups.some((g) => g.id === appState.activeGroupId)) {
       appState.activeGroupId = appState.groups[0].id;
     }
+    updateHistoryBadge();
     renderView();
   }
 
