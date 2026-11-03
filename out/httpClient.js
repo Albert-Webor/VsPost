@@ -111,7 +111,6 @@ async function executeHttpRequest(options) {
             port: parsedUrl.port || (isHttps ? 443 : 80),
             path: (parsedUrl.pathname || '/') + (parsedUrl.search || ''),
             headers: resolvedHeaders,
-            timeout: 30000,
             rejectUnauthorized: false
         };
         const responseData = await new Promise((resolve) => {
@@ -191,15 +190,6 @@ async function executeHttpRequest(options) {
                     success: false,
                     timeMs: duration,
                     error: err.message || String(err)
-                });
-            });
-            req.on('timeout', () => {
-                req.destroy();
-                const duration = Date.now() - startTime;
-                resolve({
-                    success: false,
-                    timeMs: duration,
-                    error: 'Request Timeout (30s exceeded)'
                 });
             });
             // 写入请求体

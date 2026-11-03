@@ -673,6 +673,17 @@ body {
   font-weight: 600;
 }
 
+.tab-spinner {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  border-top-color: var(--vscode-focusBorder, #3b82f6);
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
 .tab-method-tag {
   font-size: 9px;
   font-weight: 700;

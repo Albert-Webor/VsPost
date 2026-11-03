@@ -1031,6 +1031,13 @@
       titleText.textContent = tab.name || 'Untitled Request';
       tabEl.appendChild(titleText);
 
+      if (tab.isLoading) {
+        const spinner = document.createElement('span');
+        spinner.className = 'tab-spinner';
+        spinner.title = 'Executing...';
+        tabEl.appendChild(spinner);
+      }
+
       // 关闭 Tab 按钮：从标签栏关闭该请求（请求依然完整保留在群组下拉列表中）
       const closeBtn = document.createElement('button');
       closeBtn.className = 'tab-close-btn';
@@ -1098,7 +1105,24 @@
     bodyTextarea.value = tab.body || '';
     updateBodyHighlight();
     clearJsonError();
-    renderResponse(tab.response);
+
+    if (tab.isLoading) {
+      sendBtn.disabled = true;
+      sendBtnText.innerHTML = '<span class="spinner"></span> Sending...';
+      statusBadge.textContent = 'Loading...';
+      statusBadge.className = 'status-badge';
+      timeBadge.textContent = '';
+      if (sizeBadge) sizeBadge.style.display = 'none';
+      responseBodyBox.textContent = 'Sending request...';
+      if (responseHeadersBox) {
+        responseHeadersBox.innerHTML = '<div class="empty-placeholder">Waiting for response headers...</div>';
+      }
+      if (respHeadersCountBadge) respHeadersCountBadge.textContent = '';
+    } else {
+      sendBtn.disabled = false;
+      sendBtnText.textContent = 'Send';
+      renderResponse(tab.response);
+    }
   }
 
   function renderResponse(resData) {
@@ -1466,6 +1490,10 @@
 
     const activeTab = getActiveTab();
     const currentTabId = activeTab ? activeTab.id : null;
+    if (activeTab) {
+      activeTab.isLoading = true;
+      activeTab.response = null; // 清空历史结果，避免切换时渲染老结果
+    }
 
     sendBtn.disabled = true;
     sendBtnText.innerHTML = '<span class="spinner"></span> Sending...';
@@ -1478,6 +1506,9 @@
       responseHeadersBox.innerHTML = '<div class="empty-placeholder">Waiting for response headers...</div>';
     }
     if (respHeadersCountBadge) respHeadersCountBadge.textContent = '';
+
+    renderRequestTabs();
+    persistState();
 
     vscode.postMessage({
       command: 'sendRequest',
@@ -1499,8 +1530,9 @@
       const data = message.payload;
       const grp = getActiveGroup();
       if (grp && grp.tabs) {
-        const targetTab = grp.tabs.find((t) => t.id === message.tabId) || getActiveTab();
+        const targetTab = grp.tabs.find((t) => t.id === message.tabId) || (message.tabId ? null : getActiveTab());
         if (targetTab) {
+          targetTab.isLoading = false;
           targetTab.response = data;
           // 自动记录到历史记录中
           addHistoryEntry({
@@ -1514,17 +1546,22 @@
             tabId: targetTab.id
           });
         }
-        if (targetTab && targetTab.id === grp.activeTabId) {
+        if (targetTab && targetTab.id === grp.activeTabId && appState.currentView === 'requestDetail') {
+          sendBtn.disabled = false;
+          sendBtnText.textContent = 'Send';
           renderResponse(data);
         }
+        renderRequestTabs();
       }
 
-      sendBtn.disabled = false;
-      sendBtnText.textContent = 'Send';
+      vscode.postMessage({
+        command: 'ackResponse',
+        tabId: message.tabId
+      });
       persistState();
     } else if (message.command === 'stateLoaded') {
       if (message.payload) {
-        loadStateData(message.payload);
+        loadStateData(message.payload, message.activeInFlight);
       }
     }
   });
@@ -1561,7 +1598,7 @@
     }
   });
 
-  function loadStateData(data) {
+  function loadStateData(data, activeInFlight) {
     if (!data) return;
     // 兼容老数据结构
     if (Array.isArray(data.groups) && data.groups.length > 0) {
@@ -1589,6 +1626,22 @@
     if (!appState.history || !Array.isArray(appState.history)) {
       appState.history = [];
     }
+
+    // 校准正在执行中的 tab 状态
+    if (appState.groups) {
+      appState.groups.forEach((g) => {
+        if (Array.isArray(g.tabs)) {
+          g.tabs.forEach((t) => {
+            if (t.isLoading) {
+              if (activeInFlight && !activeInFlight.includes(t.id)) {
+                t.isLoading = false;
+              }
+            }
+          });
+        }
+      });
+    }
+
     if (!appState.groups.some((g) => g.id === appState.activeGroupId)) {
       appState.activeGroupId = appState.groups[0].id;
     }
